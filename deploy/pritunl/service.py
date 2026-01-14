@@ -3,7 +3,7 @@ from typing import Any
 
 from ..crypto import decrypt_str
 from ..targets.models import Target
-from .enterprise_hmac import EnterpriseHmacClient
+from .enterprise_hmac import EnterpriseHmacClient, autodetect_prefix
 
 
 def _parse_creds(target: Target) -> dict[str, Any]:
@@ -20,7 +20,7 @@ def build_client(target: Target) -> EnterpriseHmacClient:
     if not token or not secret:
         raise RuntimeError("Missing API token/secret for target")
 
-    return EnterpriseHmacClient(
+    return autodetect_prefix(
         base_url=target.base_url,
         api_token=token,
         api_secret=secret,
