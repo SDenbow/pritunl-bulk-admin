@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+  <p>First-time setup: create the initial admin account.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/setup?token={{ token }}">
+    <div class="row"><label>Username <input name="username" required></label></div>
+
+    <div class="row"><label>Password <input name="password" type="password" required></label></div>
+    <div class="row"><label>Confirm Password <input name="password2" type="password" required></label></div>
+
+    <div class="row"><label>Enable TOTP now <input name="enable_totp" type="checkbox"></label></div>
+
+    <button type="submit">Create Admin</button>
+  </form>
+{% endblock %}
