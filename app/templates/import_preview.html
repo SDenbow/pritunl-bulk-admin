@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block content %}
+
+  <div style="float:right;">
+    <form method="post" action="/logout" style="display:inline;">
+      <button type="submit">Logout</button>
+    </form>
+  </div>
+
+  <p><a href="/targets/{{ target.id }}">← Back to Target</a></p>
+
+  <h3>Import Preview (Read-only)</h3>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  {% if summary %}
+    <h4>Summary</h4>
+    <table>
+      <tr><th>Total rows</th><td>{{ summary.total_rows }}</td></tr>
+      <tr><th>Actioned rows</th><td>{{ summary.actioned_rows }}</td></tr>
+      <tr><th>Creates</th><td>{{ summary.creates }}</td></tr>
+      <tr><th>Updates</th><td>{{ summary.updates }}</td></tr>
+      <tr><th>Disables</th><td>{{ summary.disables }}</td></tr>
+      <tr><th>Deletes</th><td>{{ summary.deletes }}</td></tr>
+      <tr><th>Group clears</th><td>{{ summary.clears }}</td></tr>
+      <tr><th>Skips</th><td>{{ summary.skips }}</td></tr>
+      <tr><th>Errors</th><td>{{ summary.errors }}</td></tr>
+    </table>
+
+    <p style="margin-top:10px;">
+      <a href="/targets/{{ target.id }}/import/preview_report.csv?job={{ job_id }}">
+        <button type="button">Download Preview Report (CSV)</button>
+      </a>
+    </p>
+  {% endif %}
+
+  {% if items %}
+    <h4>Preview Items (first {{ items|length }})</h4>
+    <table>
+      <tr>
+        <th>Row</th>
+        <th>Action</th>
+        <th>Email</th>
+        <th>Username</th>
+        <th>Status</th>
+        <th>Before</th>
+        <th>After</th>
+        <th>Error</th>
+      </tr>
+      {% for it in items %}
+      <tr>
+        <td>{{ it.row }}</td>
+        <td>{{ it.action }}</td>
+        <td>{{ it.email }}</td>
+        <td>{{ it.username or "" }}</td>
+        <td>{{ it.status }}</td>
+        <td><pre style="white-space:pre-wrap;margin:0;">{{ it.before }}</pre></td>
+        <td><pre style="white-space:pre-wrap;margin:0;">{{ it.after }}</pre></td>
+        <td><pre style="white-space:pre-wrap;margin:0;">{{ it.error or "" }}</pre></td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <p style="margin-top:12px;">
+      <button type="button" disabled title="Apply will be enabled after write endpoints are verified.">
+        Apply Changes (disabled)
+      </button>
+    </p>
+  {% endif %}
+
+{% endblock %}

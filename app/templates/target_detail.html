@@ -32,6 +32,14 @@
     <button type="submit">Test: List Users</button>
   </form>
 
+  <h3 style="margin-top:18px;">Import (Preview Only)</h3>
+  <p>Upload a CSV to preview changes. No changes are applied in this phase.</p>
+
+  <form method="post" action="/targets/{{ target.id }}/import/preview" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <button type="submit">Preview CSV</button>
+  </form>
+
   {% if result %}
     <h3>Test Result</h3>
     <p><b>Org:</b> {{ result.org_name }} ({{ result.org_id }})</p>

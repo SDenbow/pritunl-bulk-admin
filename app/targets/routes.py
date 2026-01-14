@@ -2,7 +2,7 @@ import csv
 import io
 import json
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile, File
 from fastapi.responses import RedirectResponse
 from starlette.responses import Response
 from sqlalchemy.orm import Session
@@ -12,8 +12,13 @@ from ..crypto import encrypt_str
 from .models import Target
 from ..auth.routes import require_login
 from ..pritunl.service import build_client, choose_org
+from ..importer.preview import preview_csv_against_users, preview_report_csv
 
 router = APIRouter()
+
+# in-memory preview storage (MVP)
+# job_id -> full_items list
+_PREVIEW_CACHE = {}
 
 
 def _templates(request: Request):
@@ -95,10 +100,6 @@ def target_detail(request: Request, target_id: str, db: Session = Depends(get_db
 
 @router.get("/targets/{target_id}/export.csv")
 def target_export_csv(request: Request, target_id: str, db: Session = Depends(get_db)):
-    """
-    Read-only export of users to CSV.
-    Currently implemented for enterprise_hmac targets only.
-    """
     redir = require_login(request)
     if redir:
         return redir
@@ -110,7 +111,6 @@ def target_export_csv(request: Request, target_id: str, db: Session = Depends(ge
     if t.auth_mode != "enterprise_hmac":
         return Response("Export is implemented for enterprise_hmac targets only (for now).", status_code=400)
 
-    # Fetch users from Pritunl
     client = build_client(t)
     orgs = client.list_organizations()
     chosen = choose_org(orgs, t.org_name)
@@ -122,17 +122,13 @@ def target_export_csv(request: Request, target_id: str, db: Session = Depends(ge
     if not isinstance(users, list):
         return Response("Unexpected user list format from target.", status_code=500)
 
-    # Build CSV
     buf = io.StringIO()
     w = csv.writer(buf)
-
-    # Header
-    w.writerow(["action", "username", "email", "disabled", "groups"])
+    w.writerow(["action", "email", "username", "groups_mode", "groups", "disabled"])
 
     for u in users:
         username = (u.get("name") or "").strip()
         email = (u.get("email") or "").strip()
-        disabled = bool(u.get("disabled", False))
 
         groups = u.get("groups") or []
         if isinstance(groups, list):
@@ -140,11 +136,96 @@ def target_export_csv(request: Request, target_id: str, db: Session = Depends(ge
         else:
             groups_str = str(groups).strip()
 
-        w.writerow(["", username, email, "true" if disabled else "false", groups_str])
+        disabled = bool(u.get("disabled", False))
+
+        # action blank on export; groups_mode default replace
+        w.writerow(["", email, username, "replace", groups_str, "true" if disabled else "false"])
 
     csv_bytes = buf.getvalue().encode("utf-8")
-
     filename = f"{t.name}_users.csv".replace(" ", "_")
+    headers = {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    }
+    return Response(content=csv_bytes, headers=headers)
+
+
+@router.post("/targets/{target_id}/import/preview")
+async def target_import_preview(request: Request, target_id: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    t = db.query(Target).filter(Target.id == target_id).first()
+    if not t:
+        return RedirectResponse("/targets", status_code=303)
+
+    if t.auth_mode != "enterprise_hmac":
+        return _templates(request).TemplateResponse(
+            "import_preview.html",
+            {"request": request, "target": t, "error": "Preview is implemented for enterprise_hmac targets only (for now).", "summary": None, "items": None, "job_id": None},
+        )
+
+    csv_bytes = await file.read()
+
+    # fetch current users (read-only)
+    client = build_client(t)
+    orgs = client.list_organizations()
+    chosen = choose_org(orgs, t.org_name)
+    org_id = chosen.get("id")
+    if not org_id:
+        return _templates(request).TemplateResponse(
+            "import_preview.html",
+            {"request": request, "target": t, "error": "Chosen org did not include an 'id' field.", "summary": None, "items": None, "job_id": None},
+        )
+
+    users = client.list_users(org_id)
+    if not isinstance(users, list):
+        return _templates(request).TemplateResponse(
+            "import_preview.html",
+            {"request": request, "target": t, "error": "Unexpected user list format from target.", "summary": None, "items": None, "job_id": None},
+        )
+
+    try:
+        job_id, summary, items_ui, items_full = preview_csv_against_users(csv_bytes, users)
+    except Exception as e:
+        return _templates(request).TemplateResponse(
+            "import_preview.html",
+            {"request": request, "target": t, "error": str(e), "summary": None, "items": None, "job_id": None},
+        )
+
+    _PREVIEW_CACHE[job_id] = items_full
+
+    return _templates(request).TemplateResponse(
+        "import_preview.html",
+        {
+            "request": request,
+            "target": t,
+            "error": None,
+            "summary": summary,
+            "items": items_ui,
+            "job_id": job_id,
+        },
+    )
+
+
+@router.get("/targets/{target_id}/import/preview_report.csv")
+def target_import_preview_report(request: Request, target_id: str, job: str, db: Session = Depends(get_db)):
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    t = db.query(Target).filter(Target.id == target_id).first()
+    if not t:
+        return RedirectResponse("/targets", status_code=303)
+
+    items = _PREVIEW_CACHE.get(job)
+    if not items:
+        return Response("Preview report not found (job id expired). Re-run preview.", status_code=404)
+
+    csv_bytes = preview_report_csv(items)
+    filename = f"{t.name}_preview_report.csv".replace(" ", "_")
+
     headers = {
         "Content-Type": "text/csv; charset=utf-8",
         "Content-Disposition": f'attachment; filename="{filename}"',
@@ -199,7 +280,6 @@ def target_edit_post(
     t.supports_groups = (supports_groups == "on")
     t.org_name = org_name.strip() or None
 
-    # Credentials: only replace if provided (so we never show secrets)
     replace_creds = False
     new_creds = None
 
@@ -233,7 +313,6 @@ def target_edit_post(
 
     db.add(t)
     db.commit()
-
     return RedirectResponse(f"/targets/{t.id}", status_code=303)
 
 
