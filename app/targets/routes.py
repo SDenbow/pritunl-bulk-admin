@@ -8,6 +8,7 @@ from ..crypto import encrypt_str
 from .models import Target
 from ..auth.routes import require_login
 from ..pritunl.service import build_client, choose_org
+import json
 
 router = APIRouter()
 
@@ -87,6 +88,91 @@ def target_detail(request: Request, target_id: str, db: Session = Depends(get_db
         "target_detail.html",
         {"request": request, "target": t, "result": None, "error": None},
     )
+
+@router.get("/targets/{target_id}/edit")
+def target_edit_get(request: Request, target_id: str, db: Session = Depends(get_db)):
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    t = db.query(Target).filter(Target.id == target_id).first()
+    if not t:
+        return RedirectResponse("/targets", status_code=303)
+
+    return _templates(request).TemplateResponse(
+        "target_edit.html",
+        {"request": request, "target": t, "error": None},
+    )
+
+
+@router.post("/targets/{target_id}/edit")
+def target_edit_post(
+    request: Request,
+    target_id: str,
+    name: str = Form(...),
+    base_url: str = Form(...),
+    auth_mode: str = Form(...),
+    verify_tls: str = Form(default=""),
+    supports_groups: str = Form(default=""),
+    org_name: str = Form(default=""),
+    api_token: str = Form(default=""),
+    api_secret: str = Form(default=""),
+    login_user: str = Form(default=""),
+    login_pass: str = Form(default=""),
+    db: Session = Depends(get_db),
+):
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    t = db.query(Target).filter(Target.id == target_id).first()
+    if not t:
+        return RedirectResponse("/targets", status_code=303)
+
+    t.name = name.strip()
+    t.base_url = base_url.strip()
+    t.auth_mode = auth_mode
+    t.verify_tls = (verify_tls == "on")
+    t.supports_groups = (supports_groups == "on")
+    t.org_name = org_name.strip() or None
+
+    # Credentials: only replace if provided (so we never show secrets, and blanks mean "keep")
+    replace_creds = False
+    new_creds = None
+
+    if auth_mode == "enterprise_hmac":
+        if api_token.strip() or api_secret.strip():
+            # require both if changing
+            if not api_token.strip() or not api_secret.strip():
+                return _templates(request).TemplateResponse(
+                    "target_edit.html",
+                    {"request": request, "target": t, "error": "To update Enterprise credentials, provide BOTH API Token and API Secret."},
+                )
+            new_creds = {"api_token": api_token.strip(), "api_secret": api_secret.strip()}
+            replace_creds = True
+
+    elif auth_mode == "session_login":
+        if login_user.strip() or login_pass:
+            if not login_user.strip() or not login_pass:
+                return _templates(request).TemplateResponse(
+                    "target_edit.html",
+                    {"request": request, "target": t, "error": "To update Session Login credentials, provide BOTH username and password."},
+                )
+            new_creds = {"username": login_user.strip(), "password": login_pass}
+            replace_creds = True
+    else:
+        return _templates(request).TemplateResponse(
+            "target_edit.html",
+            {"request": request, "target": t, "error": "Invalid auth_mode."},
+        )
+
+    if replace_creds and new_creds is not None:
+        t.credentials_enc = encrypt_str(json.dumps(new_creds))
+
+    db.add(t)
+    db.commit()
+
+    return RedirectResponse(f"/targets/{t.id}", status_code=303)
 
 
 @router.post("/targets/{target_id}/test")
