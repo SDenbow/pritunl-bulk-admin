@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+  <p>Set up TOTP for <b>{{ username }}</b>.</p>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <p>Scan this QR code with Google Authenticator / Authy / Microsoft Authenticator:</p>
+  <img src="/setup/totp/qr.png?token={{ token }}&u={{ username }}" alt="TOTP QR">
+
+  <p><b>Backup secret (store safely):</b> {{ secret }}</p>
+
+  <form method="post" action="/setup/totp?token={{ token }}&u={{ username }}">
+    <div class="row"><label>6-digit code <input name="code" inputmode="numeric" required></label></div>
+    <button type="submit">Verify</button>
+  </form>
+{% endblock %}
