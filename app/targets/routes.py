@@ -8,7 +8,6 @@ from ..crypto import encrypt_str
 from .models import Target
 from ..auth.routes import require_login
 from ..pritunl.service import build_client, choose_org
-import json
 
 router = APIRouter()
 
