@@ -13,7 +13,7 @@
     </tr>
     {% for t in targets %}
     <tr>
-      <td>{{ t.name }}</td>
+      <td><a href="/targets/{{ t.id }}">{{ t.name }}</a></td>
       <td>{{ t.base_url }}</td>
       <td>{{ t.auth_mode }}</td>
       <td>{{ "yes" if t.verify_tls else "no" }}</td>
