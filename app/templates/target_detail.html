@@ -22,13 +22,18 @@
     <tr><th>Org</th><td>{{ target.org_name or "" }}</td></tr>
   </table>
 
-  <h3>Test Connection (Read-only)</h3>
+  <h3>Actions</h3>
+
+  <div style="margin: 10px 0;">
+    <a href="/targets/{{ target.id }}/export.csv"><button type="button">Export Users (CSV)</button></a>
+  </div>
+
   <form method="post" action="/targets/{{ target.id }}/test">
     <button type="submit">Test: List Users</button>
   </form>
 
   {% if result %}
-    <h3>Result</h3>
+    <h3>Test Result</h3>
     <p><b>Org:</b> {{ result.org_name }} ({{ result.org_id }})</p>
     <p><b>User count:</b> {{ result.user_count }}</p>
 

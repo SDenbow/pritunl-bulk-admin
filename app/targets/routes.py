@@ -1,6 +1,10 @@
+import csv
+import io
 import json
+
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse
+from starlette.responses import Response
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -88,6 +92,66 @@ def target_detail(request: Request, target_id: str, db: Session = Depends(get_db
         {"request": request, "target": t, "result": None, "error": None},
     )
 
+
+@router.get("/targets/{target_id}/export.csv")
+def target_export_csv(request: Request, target_id: str, db: Session = Depends(get_db)):
+    """
+    Read-only export of users to CSV.
+    Currently implemented for enterprise_hmac targets only.
+    """
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    t = db.query(Target).filter(Target.id == target_id).first()
+    if not t:
+        return RedirectResponse("/targets", status_code=303)
+
+    if t.auth_mode != "enterprise_hmac":
+        return Response("Export is implemented for enterprise_hmac targets only (for now).", status_code=400)
+
+    # Fetch users from Pritunl
+    client = build_client(t)
+    orgs = client.list_organizations()
+    chosen = choose_org(orgs, t.org_name)
+    org_id = chosen.get("id")
+    if not org_id:
+        return Response("Chosen org did not include an 'id' field.", status_code=500)
+
+    users = client.list_users(org_id)
+    if not isinstance(users, list):
+        return Response("Unexpected user list format from target.", status_code=500)
+
+    # Build CSV
+    buf = io.StringIO()
+    w = csv.writer(buf)
+
+    # Header
+    w.writerow(["action", "username", "email", "disabled", "groups"])
+
+    for u in users:
+        username = (u.get("name") or "").strip()
+        email = (u.get("email") or "").strip()
+        disabled = bool(u.get("disabled", False))
+
+        groups = u.get("groups") or []
+        if isinstance(groups, list):
+            groups_str = ",".join([str(g).strip() for g in groups if str(g).strip()])
+        else:
+            groups_str = str(groups).strip()
+
+        w.writerow(["", username, email, "true" if disabled else "false", groups_str])
+
+    csv_bytes = buf.getvalue().encode("utf-8")
+
+    filename = f"{t.name}_users.csv".replace(" ", "_")
+    headers = {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    }
+    return Response(content=csv_bytes, headers=headers)
+
+
 @router.get("/targets/{target_id}/edit")
 def target_edit_get(request: Request, target_id: str, db: Session = Depends(get_db)):
     redir = require_login(request)
@@ -135,13 +199,12 @@ def target_edit_post(
     t.supports_groups = (supports_groups == "on")
     t.org_name = org_name.strip() or None
 
-    # Credentials: only replace if provided (so we never show secrets, and blanks mean "keep")
+    # Credentials: only replace if provided (so we never show secrets)
     replace_creds = False
     new_creds = None
 
     if auth_mode == "enterprise_hmac":
         if api_token.strip() or api_secret.strip():
-            # require both if changing
             if not api_token.strip() or not api_secret.strip():
                 return _templates(request).TemplateResponse(
                     "target_edit.html",
