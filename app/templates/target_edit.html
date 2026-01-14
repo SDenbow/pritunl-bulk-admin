@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+
+  <p><a href="/targets">← Back to Targets</a></p>
+
+  <h3>Edit Target</h3>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/targets/{{ target.id }}/edit">
+    <div class="row"><label>Name <input name="name" value="{{ target.name }}" required></label></div>
+    <div class="row"><label>Base URL <input name="base_url" value="{{ target.base_url }}" required></label></div>
+
+    <div class="row">
+      <label>Auth Mode
+        <select name="auth_mode" required>
+          <option value="enterprise_hmac" {% if target.auth_mode == "enterprise_hmac" %}selected{% endif %}>enterprise_hmac</option>
+          <option value="session_login" {% if target.auth_mode == "session_login" %}selected{% endif %}>session_login</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row"><label>Verify TLS <input name="verify_tls" type="checkbox" {% if target.verify_tls %}checked{% endif %}></label></div>
+    <div class="row"><label>Supports Groups <input name="supports_groups" type="checkbox" {% if target.supports_groups %}checked{% endif %}></label></div>
+    <div class="row"><label>Org Name (optional) <input name="org_name" value="{{ target.org_name or '' }}"></label></div>
+
+    <fieldset>
+      <legend>Enterprise HMAC Credentials (leave blank to keep existing)</legend>
+      <div class="row"><label>API Token <input name="api_token"></label></div>
+      <div class="row"><label>API Secret <input name="api_secret"></label></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Session Login Credentials (leave blank to keep existing)</legend>
+      <div class="row"><label>Username <input name="login_user"></label></div>
+      <div class="row"><label>Password <input name="login_pass" type="password"></label></div>
+    </fieldset>
+
+    <button type="submit">Save Changes</button>
+  </form>
+
+{% endblock %}
