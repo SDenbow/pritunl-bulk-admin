@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block content %}
+
+  <div style="float:right;">
+    <form method="post" action="/logout" style="display:inline;">
+      <button type="submit">Logout</button>
+    </form>
+  </div>
+
+  <p><a href="/targets">← Back to Targets</a></p>
+
+  <h3>Target Detail</h3>
+
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <table>
+    <tr><th>Name</th><td>{{ target.name }}</td></tr>
+    <tr><th>Base URL</th><td>{{ target.base_url }}</td></tr>
+    <tr><th>Auth</th><td>{{ target.auth_mode }}</td></tr>
+    <tr><th>Verify TLS</th><td>{{ "yes" if target.verify_tls else "no" }}</td></tr>
+    <tr><th>Supports Groups</th><td>{{ "yes" if target.supports_groups else "no" }}</td></tr>
+    <tr><th>Org</th><td>{{ target.org_name or "" }}</td></tr>
+  </table>
+
+  <h3>Test Connection (Read-only)</h3>
+  <form method="post" action="/targets/{{ target.id }}/test">
+    <button type="submit">Test: List Users</button>
+  </form>
+
+  {% if result %}
+    <h3>Result</h3>
+    <p><b>Org:</b> {{ result.org_name }} ({{ result.org_id }})</p>
+    <p><b>User count:</b> {{ result.user_count }}</p>
+
+    <h4>Sample (first 10)</h4>
+    <table>
+      <tr><th>Name</th><th>Email</th><th>Disabled</th><th>Groups</th></tr>
+      {% for u in result.sample_users %}
+      <tr>
+        <td>{{ u.name or "" }}</td>
+        <td>{{ u.email or "" }}</td>
+        <td>{{ "yes" if u.disabled else "no" }}</td>
+        <td>{{ u.groups or "" }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+
+{% endblock %}
