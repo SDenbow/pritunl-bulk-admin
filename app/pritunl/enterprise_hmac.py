@@ -88,16 +88,3 @@ class EnterpriseHmacClient:
 
     def list_users(self, org_id: str):
         return self.request("GET", f"/user/{org_id}")
-
-
-def autodetect_prefix(base_url: str, api_token: str, api_secret: str, verify_tls: bool) -> EnterpriseHmacClient:
-    """
-    Compatibility shim. Your server does not use /api prefix (we verified /api/organization is 404),
-    so autodetect is effectively a no-op.
-    """
-    return EnterpriseHmacClient(
-        base_url=base_url,
-        api_token=api_token,
-        api_secret=api_secret,
-        verify_tls=verify_tls,
-    )
