@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+  {% if message %}<div class="msg">{{ message }}</div>{% endif %}
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <form method="post" action="/login">
+    <div class="row"><label>Username <input name="username" required></label></div>
+    <div class="row"><label>Password <input name="password" type="password" required></label></div>
+    <div class="row"><label>TOTP (if enabled) <input name="totp" inputmode="numeric"></label></div>
+    <button type="submit">Login</button>
+  </form>
+{% endblock %}
