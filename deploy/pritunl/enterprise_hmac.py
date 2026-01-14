@@ -5,7 +5,7 @@ import json
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Optional
 
 import requests
 
@@ -17,26 +17,31 @@ class EnterpriseHmacClient:
     api_secret: str
     verify_tls: bool = True
     timeout_s: int = 15
+    api_prefix: str = ""  # "", "/api", or a reverse-proxy prefix like "/pritunl/api"
+
+    def _normalize_path(self, path: str) -> str:
+        if not path.startswith("/"):
+            path = "/" + path
+        prefix = (self.api_prefix or "").strip()
+        if prefix and not prefix.startswith("/"):
+            prefix = "/" + prefix
+        # avoid double slashes
+        return (prefix.rstrip("/") + path) if prefix else path
 
     def _auth_headers(self, method: str, path: str, body_bytes: bytes) -> dict[str, str]:
-        """
-        Pritunl Enterprise API HMAC signing.
-        Signature = base64(HMAC_SHA256(secret, token&timestamp&nonce&method&path&body))
-        """
         timestamp = str(int(time.time()))
         nonce = uuid.uuid4().hex
         method_u = method.upper()
 
-        # Pritunl expects leading slash path, e.g. "/organization"
-        if not path.startswith("/"):
-            path = "/" + path
+        # IMPORTANT: sign the *request path* INCLUDING api_prefix
+        signed_path = self._normalize_path(path)
 
         auth_string = "&".join([
             self.api_token,
             timestamp,
             nonce,
             method_u,
-            path,
+            signed_path,
             body_bytes.decode("utf-8") if body_bytes else "",
         ])
 
@@ -45,6 +50,7 @@ class EnterpriseHmacClient:
             auth_string.encode("utf-8"),
             hashlib.sha256,
         ).digest()
+
         signature = base64.b64encode(digest).decode("utf-8")
 
         return {
@@ -55,10 +61,11 @@ class EnterpriseHmacClient:
         }
 
     def request(self, method: str, path: str, json_body: Any | None = None) -> Any:
-        url = self.base_url.rstrip("/") + (path if path.startswith("/") else f"/{path}")
+        req_path = self._normalize_path(path)
+        url = self.base_url.rstrip("/") + req_path
+
         body_bytes = b""
         headers: dict[str, str] = {}
-
         if json_body is not None:
             body_bytes = json.dumps(json_body, separators=(",", ":")).encode("utf-8")
             headers["Content-Type"] = "application/json"
@@ -74,19 +81,39 @@ class EnterpriseHmacClient:
             verify=self.verify_tls,
         )
 
-        # Raise helpful error
         if resp.status_code >= 400:
-            raise RuntimeError(f"HTTP {resp.status_code} from {path}: {resp.text[:300]}")
+            raise RuntimeError(f"HTTP {resp.status_code} from {req_path}: {resp.text[:300]}")
 
-        # Most endpoints return JSON
         if resp.headers.get("content-type", "").lower().startswith("application/json"):
             return resp.json()
-
         return resp.text
 
+    # Convenience methods
     def list_organizations(self) -> list[dict[str, Any]]:
         return self.request("GET", "/organization")
 
     def list_users(self, org_id: str) -> list[dict[str, Any]]:
-        # Common Pritunl pattern: /user/<org_id>
         return self.request("GET", f"/user/{org_id}")
+
+
+def autodetect_prefix(base_url: str, api_token: str, api_secret: str, verify_tls: bool) -> EnterpriseHmacClient:
+    """
+    Try common prefixes. If /organization 404s, try /api/organization.
+    We only use this for read-only tests.
+    """
+    # Try no prefix
+    client = EnterpriseHmacClient(base_url, api_token, api_secret, verify_tls=verify_tls, api_prefix="")
+    try:
+        client.list_organizations()
+        return client
+    except Exception as e:
+        msg = str(e)
+        if "HTTP 404" not in msg:
+            # not a 404 -> return original error
+            raise
+
+    # Try /api
+    client2 = EnterpriseHmacClient(base_url, api_token, api_secret, verify_tls=verify_tls, api_prefix="/api")
+    # If this fails, let it raise
+    client2.list_organizations()
+    return client2
