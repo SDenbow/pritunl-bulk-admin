@@ -18,6 +18,7 @@ from ..importer.preview import preview_csv_against_users, preview_report_csv
 from ..importer.models import ImportBatch, ImportRow, AuditLog
 from ..importer.apply import sha256_hex, stable_json_hash, acquire_target_lock, release_target_lock, get_actor_from_request, now_utc
 from ..settings import settings
+from ..settings_service import get_settings
 
 router = APIRouter()
 
@@ -216,6 +217,8 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
                 "can_apply": False,
                 "apply_disabled_reason": "enterprise_hmac only",
                 "apply_result": None,
+            "warn": warn,
+            "warn_msgs": warn_msgs,
             },
         )
 
@@ -351,6 +354,25 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
     can_apply = (summary.actioned_rows > 0) and (summary.errors == 0)
     apply_disabled_reason = "Apply enabled only when Actioned rows > 0 and Errors == 0."
 
+    # Guardrails (warnings only): highlight if thresholds are met/exceeded
+    app_settings = get_settings(db)
+    warn = {
+        "creates": (app_settings.warn_create_count > 0 and summary.creates >= app_settings.warn_create_count),
+        "disables": (app_settings.warn_disable_count > 0 and summary.disables >= app_settings.warn_disable_count),
+        "deletes": (app_settings.warn_delete_count > 0 and summary.deletes >= app_settings.warn_delete_count),
+        "clears": (app_settings.warn_group_clear_count > 0 and summary.clears >= app_settings.warn_group_clear_count),
+    }
+
+    warn_msgs = []
+    if warn["disables"]:
+        warn_msgs.append(f"Disables in batch: {summary.disables} (warn threshold: {app_settings.warn_disable_count})")
+    if warn["deletes"]:
+        warn_msgs.append(f"Deletes in batch: {summary.deletes} (warn threshold: {app_settings.warn_delete_count})")
+    if warn["clears"]:
+        warn_msgs.append(f"Group clears in batch: {summary.clears} (warn threshold: {app_settings.warn_group_clear_count})")
+    if warn["creates"]:
+        warn_msgs.append(f"Creates in batch: {summary.creates} (warn threshold: {app_settings.warn_create_count})")
+
     return _templates(request).TemplateResponse(
         "import_preview.html",
         {
@@ -359,6 +381,8 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
             "error": None,
             "summary": summary,
             "items": items_ui,
+            "warn": warn,
+            "warn_msgs": warn_msgs,
             "job_id": batch.id,
             "batch_id": batch.id,
             "preview_sha256": preview_sha,
