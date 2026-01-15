@@ -1,5 +1,7 @@
 services:
   db:
+    env_file:
+      - .env
     image: postgres:16
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-pritunl_admin}
@@ -15,6 +17,8 @@ services:
     restart: unless-stopped
 
   app:
+    env_file:
+      - .env
     build:
       context: ..
       dockerfile: deploy/Dockerfile
