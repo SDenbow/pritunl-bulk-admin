@@ -7,7 +7,9 @@ _ser = URLSafeSerializer(settings.session_secret, salt="session")
 
 def set_session(response, username: str):
     token = _ser.dumps({"u": username})
-    response.set_cookie("session", token, httponly=True, secure=True, samesite="lax")
+    # DEV-friendly: don't require HTTPS for cookie transmission.
+    # In production you should set secure=True once you have trusted TLS.
+    response.set_cookie("session", token, httponly=True, secure=False, samesite="lax")
 
 
 def clear_session(response):

@@ -9,7 +9,7 @@
   <h3>Targets</h3>
   <table>
     <tr>
-      <th>Name</th><th>Base URL</th><th>Auth</th><th>Verify TLS</th><th>Groups</th><th>Org</th>
+  <th>Name</th><th>Base URL</th><th>Auth</th><th>Verify TLS</th><th>Groups</th><th>Org</th><th>Actions</th>
     </tr>
     {% for t in targets %}
     <tr>
@@ -19,6 +19,7 @@
       <td>{{ "yes" if t.verify_tls else "no" }}</td>
       <td>{{ "yes" if t.supports_groups else "no" }}</td>
       <td>{{ t.org_name or "" }}</td>
+      <td><a href="/targets/{{ t.id }}/edit">Edit</a></td>
     </tr>
     {% endfor %}
   </table>
