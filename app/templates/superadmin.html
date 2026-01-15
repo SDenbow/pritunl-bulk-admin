@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="float:right;">
+  <form method="post" action="/logout" style="display:inline;">
+    <button type="submit">Logout</button>
+  </form>
+</div>
+
+<p><a href="/targets">← Back to Targets</a></p>
+
+<h3>Super Admin</h3>
+
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if message %}<div style="padding:10px;border:1px solid #ddd;margin:10px 0;">{{ message }}</div>{% endif %}
+
+{% if temp_password %}
+  <div style="padding:10px;border:2px solid #cc0000;margin:10px 0;">
+    <b>Temporary Password (shown once):</b>
+    <div style="font-family:monospace;font-size:16px;margin-top:6px;">{{ temp_password }}</div>
+  </div>
+{% endif %}
+
+<h4>Operational Safety Settings</h4>
+<form method="post" action="/superadmin/settings/update">
+  <table>
+    <tr><th>Warn if disables ≥</th><td><input type="number" name="warn_disable_count" value="{{ settings.warn_disable_count }}" min="0"></td></tr>
+    <tr><th>Warn if deletes ≥</th><td><input type="number" name="warn_delete_count" value="{{ settings.warn_delete_count }}" min="0"></td></tr>
+    <tr><th>Warn if group clears ≥</th><td><input type="number" name="warn_group_clear_count" value="{{ settings.warn_group_clear_count }}" min="0"></td></tr>
+    <tr><th>Warn if creates ≥</th><td><input type="number" name="warn_create_count" value="{{ settings.warn_create_count }}" min="0"></td></tr>
+    <tr><th>Require typed confirmation</th><td><input type="checkbox" name="require_typed_confirm" {% if settings.require_typed_confirm %}checked{% endif %}></td></tr>
+  </table>
+  <button type="submit">Save Settings</button>
+</form>
+
+<h4 style="margin-top:18px;">Admins</h4>
+
+<table>
+  <tr>
+    <th>Username</th><th>Super Admin</th><th>Disabled</th><th>Force PW Change</th><th>Actions</th>
+  </tr>
+  {% for a in admins %}
+  <tr>
+    <td>{{ a.username }}</td>
+    <td>{{ "yes" if a.is_superadmin else "no" }}</td>
+    <td>{{ "yes" if a.is_disabled else "no" }}</td>
+    <td>{{ "yes" if a.force_password_change else "no" }}</td>
+    <td>
+      <form method="post" action="/superadmin/admins/toggle_superadmin" style="display:inline;">
+        <input type="hidden" name="admin_id" value="{{ a.id }}">
+        <input type="hidden" name="make_superadmin" value="{{ 'false' if a.is_superadmin else 'true' }}">
+        <button type="submit">{{ "Demote" if a.is_superadmin else "Promote" }}</button>
+      </form>
+
+      <form method="post" action="/superadmin/admins/toggle_disabled" style="display:inline;">
+        <input type="hidden" name="admin_id" value="{{ a.id }}">
+        <input type="hidden" name="disable" value="{{ 'false' if a.is_disabled else 'true' }}">
+        <button type="submit">{{ "Enable" if a.is_disabled else "Disable" }}</button>
+      </form>
+
+      <form method="post" action="/superadmin/admins/reset_password" style="display:inline;">
+        <input type="hidden" name="admin_id" value="{{ a.id }}">
+        <button type="submit">Reset Password</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h4 style="margin-top:18px;">Create Admin</h4>
+<form method="post" action="/superadmin/admins/create">
+  <label>Username: <input name="username" required></label><br>
+  <label>Password: <input name="password" type="password" required></label><br>
+  <label><input type="checkbox" name="is_superadmin"> Make Super Admin</label><br>
+  <button type="submit">Create Admin</button>
+</form>
+
+{% endblock %}
