@@ -4,7 +4,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-VALID_ACTIONS = {"skip", "create", "update", "upsert", "disable", "delete", ""}
+# User-facing actions (blank/skip rows are ignored)
+VALID_ACTIONS = {"create", "update", "disable", "enable", "delete", "skip", ""}
 
 
 @dataclass
@@ -30,6 +31,7 @@ class PreviewSummary:
     creates: int = 0
     updates: int = 0
     disables: int = 0
+    enables: int = 0
     deletes: int = 0
     clears: int = 0
     skips: int = 0
@@ -78,6 +80,9 @@ def preview_csv_against_users(
     csv_bytes: bytes,
     existing_users: list[dict[str, Any]],
 ) -> tuple[str, PreviewSummary, list[PreviewItem], list[PreviewItem]]:
+    """
+    Returns: job_id, summary, items_for_ui (first 200), full_items
+    """
     job_id = uuid.uuid4().hex
     summary = PreviewSummary()
 
@@ -102,7 +107,9 @@ def preview_csv_against_users(
         email = _norm(row.get("email")).lower()
         username = _norm(row.get("username")) or None
 
-        groups_mode = _norm(row.get("groups_mode")).lower() or "replace"
+        # groups_mode is only "replace" or "clear" from a user POV.
+        # If blank/unknown => do not modify groups.
+        groups_mode = _norm(row.get("groups_mode")).lower()
         groups_cell = _norm(row.get("groups"))
 
         if action not in VALID_ACTIONS:
@@ -110,10 +117,12 @@ def preview_csv_against_users(
             continue
 
         if action == "" or action == "skip":
+            summary.skips += 1
             items.append(PreviewItem(i, action or "skip", email, username, "skip", "", "", None, {}, {}, False))
             continue
 
         if not email:
+            summary.errors += 1
             items.append(PreviewItem(i, action, email, username, "error", "", "", "Missing email", {}, {}, False))
             continue
 
@@ -123,36 +132,37 @@ def preview_csv_against_users(
 
         desired: dict[str, Any] = {
             "email": email,
-            "username": username,
             "groups_mode": groups_mode,
             "groups_cell": groups_cell,
         }
         diff: dict[str, Any] = {}
 
-        proposed_groups = None
-        if action in {"create", "update", "upsert"}:
+        # Determine proposed groups changes (only for create/update)
+        proposed_groups: list[str] | None = None
+        if action in {"create", "update"}:
             if groups_mode == "clear":
                 proposed_groups = []
                 summary.clears += 1
             elif groups_mode == "replace":
                 if groups_cell != "":
                     proposed_groups = _split_groups(groups_cell)
-            elif groups_mode == "empty":
-                proposed_groups = None
             else:
-                items.append(PreviewItem(i, action, email, username, "error", before_str, "", f"Invalid groups_mode '{groups_mode}'", {}, {}, False))
-                continue
+                # blank/unknown => do not modify groups
+                proposed_groups = None
 
         if action == "create":
             summary.actioned_rows += 1
             summary.creates += 1
             if existing:
+                summary.errors += 1
                 items.append(PreviewItem(i, action, email, username, "error", before_str, "", "User already exists (email match)", {}, {}, False))
                 continue
             if not username:
+                summary.errors += 1
                 items.append(PreviewItem(i, action, email, username, "error", "(not found)", "", "Create requires username", {}, {}, False))
                 continue
 
+            desired["username"] = username
             desired["groups"] = proposed_groups or []
             diff = {"create": True}
             after_str = f"email={email}, name={username}, disabled=False, groups={','.join(desired['groups'])}"
@@ -163,66 +173,35 @@ def preview_csv_against_users(
             summary.actioned_rows += 1
             summary.updates += 1
             if not existing:
+                summary.errors += 1
                 items.append(PreviewItem(i, action, email, username, "error", "(not found)", "", "User not found for update (email match)", {}, {}, False))
                 continue
 
-            new_name = username if username else _norm(existing.get("name"))
-            desired["final_name"] = new_name
+            # username is read-only: we do NOT propose name changes
+            if username:
+                desired["username_ignored"] = True
 
+            final_groups = existing.get("groups")
             if proposed_groups is not None:
                 desired["groups"] = proposed_groups
                 diff["groups"] = {"from": existing.get("groups"), "to": proposed_groups}
-            if username:
-                diff["name"] = {"from": existing.get("name"), "to": new_name}
+                final_groups = proposed_groups
 
-            disabled = bool(existing.get("disabled", False))
-            final_groups = existing.get("groups") if proposed_groups is None else proposed_groups
             if isinstance(final_groups, list):
                 final_groups_str = ",".join([str(g) for g in final_groups])
             else:
                 final_groups_str = _norm(final_groups)
 
-            after_str = f"email={email}, name={new_name}, disabled={disabled}, groups={final_groups_str}"
+            disabled = bool(existing.get("disabled", False))
+            after_str = f"email={email}, name={_norm(existing.get('name'))}, disabled={disabled}, groups={final_groups_str}"
             items.append(PreviewItem(i, action, email, username, "ok", before_str, after_str, None, desired, diff, True))
-            continue
-
-        if action == "upsert":
-            summary.actioned_rows += 1
-            if existing:
-                summary.updates += 1
-                new_name = username if username else _norm(existing.get("name"))
-                desired["final_name"] = new_name
-
-                if proposed_groups is not None:
-                    desired["groups"] = proposed_groups
-                    diff["groups"] = {"from": existing.get("groups"), "to": proposed_groups}
-                if username:
-                    diff["name"] = {"from": existing.get("name"), "to": new_name}
-
-                disabled = bool(existing.get("disabled", False))
-                final_groups = existing.get("groups") if proposed_groups is None else proposed_groups
-                if isinstance(final_groups, list):
-                    final_groups_str = ",".join([str(g) for g in final_groups])
-                else:
-                    final_groups_str = _norm(final_groups)
-
-                after_str = f"email={email}, name={new_name}, disabled={disabled}, groups={final_groups_str}"
-                items.append(PreviewItem(i, action, email, username, "ok", before_str, after_str, None, desired, diff, True))
-            else:
-                summary.creates += 1
-                if not username:
-                    items.append(PreviewItem(i, action, email, username, "error", "(not found)", "", "Upsert(create) requires username", {}, {}, False))
-                    continue
-                desired["groups"] = proposed_groups or []
-                diff = {"create": True}
-                after_str = f"email={email}, name={username}, disabled=False, groups={','.join(desired['groups'])}"
-                items.append(PreviewItem(i, action, email, username, "ok", "(not found)", after_str, None, desired, diff, True))
             continue
 
         if action == "disable":
             summary.actioned_rows += 1
             summary.disables += 1
             if not existing:
+                summary.errors += 1
                 items.append(PreviewItem(i, action, email, username, "error", "(not found)", "", "User not found for disable (email match)", {}, {}, False))
                 continue
             diff = {"disabled": {"from": bool(existing.get("disabled", False)), "to": True}}
@@ -230,10 +209,23 @@ def preview_csv_against_users(
             items.append(PreviewItem(i, action, email, username, "ok", before_str, after_str, None, desired, diff, True))
             continue
 
+        if action == "enable":
+            summary.actioned_rows += 1
+            summary.enables += 1
+            if not existing:
+                summary.errors += 1
+                items.append(PreviewItem(i, action, email, username, "error", "(not found)", "", "User not found for enable (email match)", {}, {}, False))
+                continue
+            diff = {"disabled": {"from": bool(existing.get("disabled", False)), "to": False}}
+            after_str = f"email={email}, name={_norm(existing.get('name'))}, disabled=False, groups={','.join(existing.get('groups') or []) if isinstance(existing.get('groups'), list) else _norm(existing.get('groups'))}"
+            items.append(PreviewItem(i, action, email, username, "ok", before_str, after_str, None, desired, diff, True))
+            continue
+
         if action == "delete":
             summary.actioned_rows += 1
             summary.deletes += 1
             if not existing:
+                summary.errors += 1
                 items.append(PreviewItem(i, action, email, username, "error", "(not found)", "", "User not found for delete (email match)", {}, {}, False))
                 continue
             diff = {"delete": True}
@@ -241,6 +233,7 @@ def preview_csv_against_users(
             items.append(PreviewItem(i, action, email, username, "ok", before_str, after_str, None, desired, diff, True))
             continue
 
+        summary.errors += 1
         items.append(PreviewItem(i, action, email, username, "error", before_str, "", "Unhandled action", {}, {}, False))
 
     summary.errors = sum(1 for it in items if it.status == "error")

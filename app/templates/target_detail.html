@@ -32,8 +32,15 @@
     <button type="submit">Test: List Users</button>
   </form>
 
-  <h3 style="margin-top:18px;">Import (Preview Only)</h3>
-  <p>Upload a CSV to preview changes. No changes are applied in this phase.</p>
+  <h3 style="margin-top:18px;">Import</h3>
+  <p>
+    Download the import template, fill it in, then upload it to preview/apply changes.<br>
+    <small><b>Import headers:</b> <code>action,email,username,groups_mode,groups</code> (no <code>status</code>).</small>
+  </p>
+
+  <div style="margin: 10px 0;">
+    <a href="/targets/{{ target.id }}/import/template.csv"><button type="button">Download Import Template (CSV)</button></a>
+  </div>
 
   <form method="post" action="/targets/{{ target.id }}/import/preview" enctype="multipart/form-data">
     <input type="file" name="file" accept=".csv" required>

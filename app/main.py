@@ -8,10 +8,12 @@ from .db import Base, engine
 from .auth import models as _auth_models  # noqa: F401
 from .targets import models as _targets_models  # noqa: F401
 from .importer import models as _import_models  # noqa: F401
+from .settings_db import AppSettings as _app_settings_model  # noqa: F401
 
 from .setup.routes import router as setup_router
 from .auth.routes import router as auth_router
 from .targets.routes import router as targets_router
+from .admin.routes import router as admin_router
 
 
 def create_app() -> FastAPI:
@@ -27,6 +29,7 @@ def create_app() -> FastAPI:
     app.include_router(setup_router)
     app.include_router(auth_router)
     app.include_router(targets_router)
+    app.include_router(admin_router)
 
     return app
 
