@@ -124,7 +124,7 @@ def target_export_csv(request: Request, target_id: str, db: Session = Depends(ge
 
     buf = io.StringIO()
     w = csv.writer(buf)
-    w.writerow(["action", "email", "username", "groups_mode", "groups", "disabled"])
+    w.writerow(["action", "email", "username", "groups_mode", "groups", "status"])
 
     for u in users:
         username = (u.get("name") or "").strip()
@@ -139,9 +139,9 @@ def target_export_csv(request: Request, target_id: str, db: Session = Depends(ge
         disabled = bool(u.get("disabled", False))
 
         # action blank on export; groups_mode default replace
-        w.writerow(["", email, username, "replace", groups_str, "true" if disabled else "false"])
+        w.writerow(["", email, username, "replace", groups_str, "disabled" if disabled else "active"])
 
-    csv_bytes = buf.getvalue().encode("utf-8")
+    csv_bytes = ("\ufeff" + buf.getvalue()).encode("utf-8")
     filename = f"{t.name}_users.csv".replace(" ", "_")
     headers = {
         "Content-Type": "text/csv; charset=utf-8",
