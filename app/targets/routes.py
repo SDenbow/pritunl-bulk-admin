@@ -99,6 +99,48 @@ def target_detail(request: Request, target_id: str, db: Session = Depends(get_db
     )
 
 
+@router.get("/targets/{target_id}/import/template.csv")
+def target_import_template_csv(request: Request, target_id: str, db: Session = Depends(get_db)):
+    """
+    Download an import template (headers + example rows).
+
+    Import headers:
+      action,email,username,groups_mode,groups
+
+    Notes:
+      - status is export-only (do not include it in imports)
+      - quote groups if it contains commas, e.g. "Admin,IT,ClientA"
+    """
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    t = db.query(Target).filter(Target.id == target_id).first()
+    if not t:
+        return RedirectResponse("/targets", status_code=303)
+
+    buf = io.StringIO()
+    w = csv.writer(buf)
+
+    # Required headers
+    w.writerow(["action", "email", "username", "groups_mode", "groups"])
+
+    # Example rows (generic data)
+    w.writerow(["create", "jane.doe@example.com", "Jane Doe", "replace", '"Admin,IT,ClientA"'])
+    w.writerow(["update", "john.smith@example.com", "", "replace", "ClientA"])
+    w.writerow(["disable", "disabled.user@example.com", "", "", ""])
+    w.writerow(["enable", "reenable.user@example.com", "", "", ""])
+    w.writerow(["delete", "former.user@example.com", "", "", ""])
+
+    # Excel-friendly UTF-8 BOM
+    csv_bytes = ("\ufeff" + buf.getvalue()).encode("utf-8")
+    filename = f"{t.name}_import_template.csv".replace(" ", "_")
+    headers = {
+        "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": f'attachment; filename="{filename}"',
+    }
+    return Response(content=csv_bytes, headers=headers)
+
 @router.get("/targets/{target_id}/export.csv")
 def target_export_csv(request: Request, target_id: str, db: Session = Depends(get_db)):
     redir = require_login(request)
@@ -138,7 +180,6 @@ def target_export_csv(request: Request, target_id: str, db: Session = Depends(ge
             groups_str = str(groups).strip()
 
         disabled = bool(u.get("disabled", False))
-
         w.writerow(["", email, username, "replace", groups_str, "disabled" if disabled else "active"])
 
     csv_bytes = ("\ufeff" + buf.getvalue()).encode("utf-8")
@@ -181,7 +222,6 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
     csv_bytes = await file.read()
     csv_sha = sha256_hex(csv_bytes)
 
-    # fetch current users (read-only)
     client = build_client(t)
     orgs = client.list_organizations()
     chosen = choose_org(orgs, t.org_name)
@@ -243,7 +283,6 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
             },
         )
 
-    # Hash the full plan that we displayed (tamper-proof Apply)
     plan_for_hash = [
         {
             "row": it.row,
@@ -277,6 +316,7 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
             "creates": summary.creates,
             "updates": summary.updates,
             "disables": summary.disables,
+            "enables": summary.enables,
             "deletes": summary.deletes,
             "clears": summary.clears,
             "skips": summary.skips,
@@ -319,7 +359,7 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
             "error": None,
             "summary": summary,
             "items": items_ui,
-            "job_id": batch.id,            # used in report URL
+            "job_id": batch.id,
             "batch_id": batch.id,
             "preview_sha256": preview_sha,
             "can_apply": can_apply,
@@ -331,7 +371,6 @@ async def target_import_preview(request: Request, target_id: str, file: UploadFi
 
 @router.get("/targets/{target_id}/import/preview_report.csv")
 def target_import_preview_report(request: Request, target_id: str, job: str, db: Session = Depends(get_db)):
-    # 'job' now maps to batch_id
     redir = require_login(request)
     if redir:
         return redir
@@ -460,9 +499,10 @@ def target_import_apply(
                         continue
 
                     name = (r.username or "").strip()
-                    groups = (r.desired or {}).get("groups") or []
-                    op_req = {"email": email, "name": name, "groups": groups}
+                    if not name:
+                        raise RuntimeError("Create requires username")
 
+                    groups = (r.desired or {}).get("groups") or []
                     resp = create_user(client, org_id, name=name, email=email, groups=groups if t.supports_groups else None)
 
                     db.add(AuditLog(
@@ -473,7 +513,7 @@ def target_import_apply(
                         email=email,
                         operation="user.create",
                         success=True,
-                        request=op_req,
+                        request={"email": email, "name": name, "groups": groups},
                         response={"result": resp},
                     ))
 
@@ -496,9 +536,7 @@ def target_import_apply(
 
                     merged = dict(existing)
 
-                    # username allowed (display); email is authoritative key
-                    if r.username:
-                        merged["name"] = r.username
+                    # Username is read-only for update; do NOT set merged["name"]
 
                     gm = ((r.desired or {}).get("groups_mode") or "").lower()
                     groups_cell = (r.desired or {}).get("groups_cell") or ""
@@ -510,10 +548,11 @@ def target_import_apply(
                         elif gm == "replace":
                             if str(groups_cell) != "":
                                 merged["groups"] = desired_groups or []
-                        elif gm == "empty":
-                            pass
+                        else:
+                            pass  # blank/unknown => do nothing
 
-                    if merged.get("name") == existing.get("name") and merged.get("groups") == existing.get("groups"):
+                    # idempotent best-effort
+                    if merged.get("groups") == existing.get("groups"):
                         r.apply_status = "skipped"
                         r.apply_result = {"reason": "idempotent: no change"}
                         results["skipped"] += 1
@@ -538,76 +577,6 @@ def target_import_apply(
                     r.apply_result = {"result": resp}
                     r.applied_at = now_utc()
                     results["applied"] += 1
-
-                elif action == "upsert":
-                    if existing:
-                        user_id = existing.get("id")
-                        if not user_id:
-                            raise RuntimeError("Existing user record missing id")
-
-                        merged = dict(existing)
-                        if r.username:
-                            merged["name"] = r.username
-
-                        gm = ((r.desired or {}).get("groups_mode") or "").lower()
-                        groups_cell = (r.desired or {}).get("groups_cell") or ""
-                        desired_groups = (r.desired or {}).get("groups")
-
-                        if t.supports_groups:
-                            if gm == "clear":
-                                merged["groups"] = []
-                            elif gm == "replace":
-                                if str(groups_cell) != "":
-                                    merged["groups"] = desired_groups or []
-                            elif gm == "empty":
-                                pass
-
-                        if merged.get("name") == existing.get("name") and merged.get("groups") == existing.get("groups"):
-                            r.apply_status = "skipped"
-                            r.apply_result = {"reason": "idempotent: no change"}
-                            results["skipped"] += 1
-                            db.add(r)
-                            continue
-
-                        resp = update_user_full(client, org_id, user_id, merged)
-
-                        db.add(AuditLog(
-                            actor=actor,
-                            target_id=t.id,
-                            batch_id=batch.id,
-                            row_id=r.id,
-                            email=email,
-                            operation="user.upsert.update",
-                            success=True,
-                            request={"user_id": user_id},
-                            response={"result": resp},
-                        ))
-
-                        r.apply_status = "applied"
-                        r.apply_result = {"result": resp}
-                        r.applied_at = now_utc()
-                        results["applied"] += 1
-                    else:
-                        name = (r.username or "").strip()
-                        groups = (r.desired or {}).get("groups") or []
-                        resp = create_user(client, org_id, name=name, email=email, groups=groups if t.supports_groups else None)
-
-                        db.add(AuditLog(
-                            actor=actor,
-                            target_id=t.id,
-                            batch_id=batch.id,
-                            row_id=r.id,
-                            email=email,
-                            operation="user.upsert.create",
-                            success=True,
-                            request={"email": email, "name": name, "groups": groups},
-                            response={"result": resp},
-                        ))
-
-                        r.apply_status = "applied"
-                        r.apply_result = {"result": resp}
-                        r.applied_at = now_utc()
-                        results["applied"] += 1
 
                 elif action == "disable":
                     if not existing:
@@ -642,6 +611,47 @@ def target_import_apply(
                         operation="user.disable",
                         success=True,
                         request={"user_id": user_id, "disabled": True},
+                        response={"result": resp},
+                    ))
+
+                    r.apply_status = "applied"
+                    r.apply_result = {"result": resp}
+                    r.applied_at = now_utc()
+                    results["applied"] += 1
+
+                elif action == "enable":
+                    if not existing:
+                        r.apply_status = "skipped"
+                        r.apply_result = {"reason": "missing user for enable; ignored"}
+                        results["skipped"] += 1
+                        db.add(r)
+                        continue
+
+                    user_id = existing.get("id")
+                    if not user_id:
+                        raise RuntimeError("Existing user record missing id")
+
+                    if bool(existing.get("disabled", False)) is False:
+                        r.apply_status = "skipped"
+                        r.apply_result = {"reason": "idempotent: already enabled"}
+                        results["skipped"] += 1
+                        db.add(r)
+                        continue
+
+                    merged = dict(existing)
+                    merged["disabled"] = False
+
+                    resp = update_user_full(client, org_id, user_id, merged)
+
+                    db.add(AuditLog(
+                        actor=actor,
+                        target_id=t.id,
+                        batch_id=batch.id,
+                        row_id=r.id,
+                        email=email,
+                        operation="user.enable",
+                        success=True,
+                        request={"user_id": user_id, "disabled": False},
                         response={"result": resp},
                     ))
 
@@ -718,7 +728,6 @@ def target_import_apply(
         db.add(batch)
         db.commit()
 
-        # Re-render preview page w/ results
         items_ui = []
         for rr in rows[:200]:
             items_ui.append({
