@@ -61,11 +61,31 @@
       {% endfor %}
     </table>
 
-    <p style="margin-top:12px;">
-      <button type="button" disabled title="Apply will be enabled after write endpoints are verified.">
+    <h4 style="margin-top:14px;">Apply</h4>
+
+    {% if can_apply %}
+      <form method="post" action="/targets/{{ target.id }}/import/apply" style="margin-top:8px;">
+        <input type="hidden" name="batch_id" value="{{ batch_id }}">
+        <input type="hidden" name="preview_sha256" value="{{ preview_sha256 }}">
+
+        <label style="display:block;margin:8px 0;">
+          <input type="checkbox" name="confirm" value="yes" required>
+          I understand this will make changes on the target and will be fully audited.
+        </label>
+
+        <button type="submit">Apply Changes</button>
+      </form>
+    {% else %}
+      <button type="button" disabled title="{{ apply_disabled_reason }}">
         Apply Changes (disabled)
       </button>
-    </p>
+    {% endif %}
+
+  {% endif %}
+
+  {% if apply_result %}
+    <h4 style="margin-top:16px;">Apply Result</h4>
+    <pre style="white-space:pre-wrap;">{{ apply_result }}</pre>
   {% endif %}
 
 {% endblock %}
