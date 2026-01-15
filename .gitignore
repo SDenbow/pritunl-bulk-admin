@@ -1,0 +1,11 @@
+
+# Local env files
+.env
+deploy/.env
+
+# TLS / local nginx
+deploy/nginx/certs/
+deploy/nginx/htpasswd
+
+# Compose backups
+*.bak
