@@ -1,20 +1,25 @@
 import io
-from fastapi import APIRouter, Depends, Form, Request, Query
-from fastapi.responses import RedirectResponse, Response
+from fastapi import HTTPException, APIRouter, Depends, Form, Request, Query
+from fastapi.responses import RedirectResponse, Response, PlainTextResponse
 from sqlalchemy.orm import Session
 from passlib.hash import argon2
 import qrcode
 import pyotp
 
+from ..bootstrap import is_bootstrapped
 from ..db import get_db
 from ..settings import settings
 from ..crypto import encrypt_str, decrypt_str
 from ..auth.models import Admin
 from ..auth.totp import new_totp_secret, totp_now_ok
 
-router = APIRouter()
 
+def setup_guard():
+    # After the first admin exists, setup routes should disappear (404).
+    if is_bootstrapped():
+        raise HTTPException(status_code=404)
 
+router = APIRouter(dependencies=[Depends(setup_guard)])
 def _templates(request: Request):
     return request.app.state.templates
 

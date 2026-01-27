@@ -9,3 +9,7 @@ deploy/nginx/htpasswd
 
 # Compose backups
 *.bak
+
+# Python cache
+__pycache__/
+*.pyc

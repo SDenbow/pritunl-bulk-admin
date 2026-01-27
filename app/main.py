@@ -5,6 +5,8 @@ from starlette.templating import Jinja2Templates
 from .settings import settings
 from .db import Base, engine
 
+from .bootstrap import is_bootstrapped
+
 # Ensure models are imported before create_all
 from .auth import models as _auth_models  # noqa: F401
 from .targets import models as _targets_models  # noqa: F401
@@ -29,6 +31,8 @@ def create_app() -> FastAPI:
     Base.metadata.create_all(bind=engine)
 
     app.state.templates = Jinja2Templates(directory="app/templates")
+
+    app.state.bootstrapped = is_bootstrapped()
 
     app.include_router(setup_router)
     app.include_router(auth_router)
