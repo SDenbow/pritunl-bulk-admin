@@ -14,10 +14,15 @@ from ..auth.models import Admin
 from ..auth.totp import new_totp_secret, totp_now_ok
 
 
-def setup_guard():
-    # After the first admin exists, setup routes should disappear (404).
+def setup_guard(token: str | None = None):
+    # If already bootstrapped, setup must disappear completely
     if is_bootstrapped():
         raise HTTPException(status_code=404)
+
+    # If SETUP_TOKEN is configured, enforce it
+    if settings.setup_token:
+        if token != settings.setup_token:
+            raise HTTPException(status_code=404)
 
 router = APIRouter(dependencies=[Depends(setup_guard)])
 def _templates(request: Request):
