@@ -5,7 +5,7 @@ Docker Compose deployment for a FastAPI + Postgres internal admin tool used to b
 ## Prerequisites
 - Docker + Docker Compose (v2)
 - Host can reach your Pritunl API endpoints
-- HTTPS certs for the included Nginx proxy (or use your own reverse proxy)
+- TLS cert + key for the included Nginx reverse proxy (or use your own proxy)
 
 ---
 
@@ -24,11 +24,10 @@ Docker Compose deployment for a FastAPI + Postgres internal admin tool used to b
     docker compose up -d --build
 
 5) Bootstrap first admin (one-time):
-- Open:
     https://<host>/setup?token=<SETUP_TOKEN>
-- Create the first admin user (becomes a superadmin)
-- After first admin exists:
-  - setup routes are disabled and return 404
+
+- Create the first admin user (becomes a superadmin).
+- After first admin exists, setup routes are disabled and return 404.
 
 6) Log in:
     https://<host>/login
@@ -39,7 +38,7 @@ Docker Compose deployment for a FastAPI + Postgres internal admin tool used to b
 
 ### App (required)
 - DATABASE_URL
-  Example (matches compose service name `db`):
+  Example (compose service name is `db`):
     postgresql+psycopg2://pritunl_admin:<password>@db:5432/pritunl_admin
 
 - SESSION_SECRET
@@ -51,7 +50,7 @@ Docker Compose deployment for a FastAPI + Postgres internal admin tool used to b
 
 - SETUP_TOKEN
   Required to access `/setup` until the first admin is created.
-  After bootstrap, `/setup` returns 404 regardless.
+  After bootstrap, `/setup` returns 404 regardless of token.
 
 ### App (optional)
 - APP_ENV (default: prod)
@@ -73,22 +72,34 @@ Docker Compose deployment for a FastAPI + Postgres internal admin tool used to b
 
 ## Reverse proxy notes (Nginx)
 
-This deployment includes an Nginx container terminating HTTPS on port 443 and proxying to the app.
+This deployment includes an Nginx container that terminates HTTPS on port 443 and proxies traffic to the FastAPI app container.
 
-- Config file:
-  deploy/nginx/default.conf
-- Certificates directory:
-  deploy/nginx/certs/
+TLS certificate files required (mounted read-only into the container):
+- deploy/nginx/certs/fullchain.pem
+- deploy/nginx/certs/privkey.pem
 
-Optional outer auth:
-- If you create:
-  deploy/nginx/htpasswd
-  it will be mounted and can be used by the Nginx config.
+Default behavior:
+- Nginx listens on 443
+- All traffic proxies to http://app:8000
+- Forwarded headers set:
+  - Host
+  - X-Forwarded-Proto (https)
+  - X-Real-IP
+  - X-Forwarded-For
 
-If using an external reverse proxy:
-- You can remove/disable the nginx service and proxy to the app service (port 8000).
-- Forward standard headers:
-  Host, X-Forwarded-For, X-Forwarded-Proto
+Optional Basic Auth (outer gate):
+- Create: deploy/nginx/htpasswd
+- Uncomment these lines in deploy/nginx/default.conf:
+  - auth_basic "Restricted";
+  - auth_basic_user_file /etc/nginx/.htpasswd;
+
+Using an external reverse proxy:
+- You may disable/remove the nginx service from compose
+- Proxy directly to the app service on port 8000
+- Ensure these headers are forwarded:
+  - Host
+  - X-Forwarded-For
+  - X-Forwarded-Proto
 
 ---
 
@@ -96,7 +107,6 @@ If using an external reverse proxy:
 
 Backup (recommended):
     cd deploy
-    # Uses the values from your deploy/.env file
     docker compose exec -T db bash -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup.sql
 
 Restore:
