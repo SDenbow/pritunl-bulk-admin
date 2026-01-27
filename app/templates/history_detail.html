@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+  <div>
+    <a href="/history" class="small">← Back to History</a>
+    <h2>Audit Entry</h2>
+  </div>
+</div>
+
+<div class="card">
+  <div class="grid">
+    <div class="row"><b>When (UTC)</b><div class="small">{{ log.ts }}</div></div>
+    <div class="row"><b>Target</b><div class="small">{{ target_name }}</div></div>
+    <div class="row"><b>Actor</b><div class="small">{{ log.actor }}</div></div>
+    <div class="row"><b>Operation</b><div class="small">{{ log.operation }}</div></div>
+    <div class="row"><b>Email</b><div class="small">{{ log.email or "" }}</div></div>
+    <div class="row"><b>Batch ID</b><div class="small">{{ log.batch_id or "" }}</div></div>
+    <div class="row"><b>Row ID</b><div class="small">{{ log.row_id or "" }}</div></div>
+    <div class="row"><b>Success</b><div class="small">{{ "yes" if log.success else "no" }}</div></div>
+  </div>
+
+  {% if log.error %}
+    <div class="alert error">
+      <div class="title">Error</div>
+      <div class="small">{{ log.error }}</div>
+    </div>
+  {% endif %}
+
+  <div class="alert warn">
+    <div class="title">Note</div>
+    <div class="small">Request/response fields are redacted in the UI to avoid leaking secrets.</div>
+  </div>
+
+  <h3>Request (redacted)</h3>
+  <pre style="white-space:pre-wrap; background:var(--panel-2); border:1px solid var(--border); padding:12px; border-radius:8px;">{{ safe_request_json }}</pre>
+
+  <h3>Response (redacted)</h3>
+  <pre style="white-space:pre-wrap; background:var(--panel-2); border:1px solid var(--border); padding:12px; border-radius:8px;">{{ safe_response_json }}</pre>
+</div>
+
+{% endblock %}

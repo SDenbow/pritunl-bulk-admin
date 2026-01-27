@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+  <h2>History</h2>
+  <div class="small">Showing newest first</div>
+</div>
+
+<div class="card">
+  <form method="get" action="/history" class="grid">
+    <div class="row">
+      <label for="target_id">Target</label>
+      <select id="target_id" name="target_id">
+        <option value="">(all)</option>
+        {% for tid, tname in target_options %}
+          <option value="{{ tid }}" {% if filters.target_id == tid %}selected{% endif %}>{{ tname }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="row">
+      <label for="actor">Actor</label>
+      <input id="actor" name="actor" value="{{ filters.actor }}" placeholder="e.g. steve">
+    </div>
+
+    <div class="row">
+      <label for="operation">Operation</label>
+      <input id="operation" name="operation" value="{{ filters.operation }}" placeholder="e.g. create_user, import_apply">
+    </div>
+
+    <div class="row">
+      <label for="email">Email</label>
+      <input id="email" name="email" value="{{ filters.email }}" placeholder="e.g. user@example.com">
+    </div>
+
+    <div class="row">
+      <label for="success">Success</label>
+      <select id="success" name="success">
+        <option value="" {% if not filters.success %}selected{% endif %}>(all)</option>
+        <option value="true" {% if filters.success == "true" %}selected{% endif %}>true</option>
+        <option value="false" {% if filters.success == "false" %}selected{% endif %}>false</option>
+      </select>
+    </div>
+
+    <div class="row">
+      <label for="batch_id">Batch ID</label>
+      <input id="batch_id" name="batch_id" value="{{ filters.batch_id }}" placeholder="(optional)">
+    </div>
+
+    <div class="row">
+      <label for="limit">Limit</label>
+      <select id="limit" name="limit">
+        {% for n in [100,200,500,1000] %}
+          <option value="{{ n }}" {% if filters.limit == n %}selected{% endif %}>{{ n }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="row" style="display:flex; align-items:flex-end; gap:10px;">
+      <button class="btn primary" type="submit">Filter</button>
+      <a class="btn" href="/history">Reset</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  {% if logs and logs|length > 0 %}
+    <table>
+      <thead>
+        <tr>
+          <th>When (UTC)</th>
+          <th>Target</th>
+          <th>Actor</th>
+          <th>Operation</th>
+          <th>Email</th>
+          <th>Batch</th>
+          <th>Success</th>
+          <th>Error</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in logs %}
+          <tr>
+            <td>{{ r.ts }}</td>
+            <td>{{ target_map.get(r.target_id, r.target_id) }}</td>
+            <td>{{ r.actor }}</td>
+            <td>{{ r.operation }}</td>
+            <td>{{ r.email or "" }}</td>
+            <td class="small">{{ r.batch_id or "" }}</td>
+            <td>{{ "yes" if r.success else "no" }}</td>
+            <td class="small">{{ (r.error or "")[:120] }}</td>
+            <td><a href="/history/{{ r.id }}">Details</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="small">No audit entries found for the current filters.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

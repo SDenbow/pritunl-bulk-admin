@@ -15,6 +15,7 @@ from .setup.routes import router as setup_router
 from .auth.routes import router as auth_router
 from .targets.routes import router as targets_router
 from .admin.routes import router as admin_router
+from .history.routes import router as history_router
 
 
 def create_app() -> FastAPI:
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(targets_router)
     app.include_router(admin_router)
+    app.include_router(history_router)
 
     return app
 
