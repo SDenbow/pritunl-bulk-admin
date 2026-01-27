@@ -98,6 +98,7 @@ def setup_post(
         password_hash=argon2.hash(password),
         is_totp_enabled=totp_enabled,
         totp_secret_enc=None,
+        is_superadmin=True,  # first admin must be superadmin
     )
 
     if totp_enabled:
