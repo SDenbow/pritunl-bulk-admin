@@ -1,12 +1,41 @@
 {% extends "base.html" %}
 {% block content %}
-  {% if message %}<div class="msg">{{ message }}</div>{% endif %}
-  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+<div class="card form-narrow">
+  <h2>Login</h2>
+
+  {% if message %}
+    <div class="alert ok">
+      {{ message }}
+    </div>
+  {% endif %}
+
+  {% if error %}
+    <div class="alert error">
+      {{ error }}
+    </div>
+  {% endif %}
 
   <form method="post" action="/login">
-    <div class="row"><label>Username <input name="username" required></label></div>
-    <div class="row"><label>Password <input name="password" type="password" required></label></div>
-    <div class="row"><label>TOTP (if enabled) <input name="totp" inputmode="numeric"></label></div>
-    <button type="submit">Login</button>
+    <div class="row">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autofocus required>
+    </div>
+
+    <div class="row">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" required>
+    </div>
+
+    <div class="row">
+      <label for="totp">TOTP (if enabled)</label>
+      <input id="totp" name="totp" type="text" autocomplete="one-time-code">
+    </div>
+
+    <div class="row" style="display:flex; justify-content:flex-end;">
+      <button class="btn primary" type="submit">Login</button>
+    </div>
   </form>
+</div>
+
 {% endblock %}

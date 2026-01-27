@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+  <h2>Add Target</h2>
+  <a class="btn" href="/targets">Back to Targets</a>
+</div>
+
+{% if error %}
+  <div class="alert error">
+    <div class="title">Error</div>
+    <div>{{ error }}</div>
+  </div>
+{% endif %}
+
+<div class="card">
+  <form method="post" action="/targets/new">
+    <div class="row">
+      <label for="name">Name</label>
+      <input id="name" name="name" type="text" required>
+    </div>
+
+    <div class="row">
+      <label for="base_url">Base URL</label>
+      <input id="base_url" name="base_url" type="text" placeholder="https://your-pritunl.example.com" required>
+      <div class="small">Include https:// and the hostname.</div>
+    </div>
+
+    <div class="row">
+      <label for="auth_mode">Auth Mode</label>
+      <select id="auth_mode" name="auth_mode" required>
+        <option value="enterprise_hmac" selected>enterprise_hmac</option>
+        <option value="session_login">session_login</option>
+      </select>
+    </div>
+
+    <div class="grid">
+      <div class="row">
+        <label>
+          <input type="checkbox" name="verify_tls" checked>
+          Verify TLS
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          <input type="checkbox" name="supports_groups">
+          Supports Groups
+        </label>
+      </div>
+    </div>
+
+    <div class="row">
+      <label for="org_name">Org Name (optional)</label>
+      <input id="org_name" name="org_name" type="text" placeholder="Leave blank unless multiple orgs exist">
+    </div>
+
+    <fieldset>
+      <legend>Enterprise HMAC Credentials</legend>
+      <div class="row">
+        <label for="api_token">API Token</label>
+        <input id="api_token" name="api_token" type="text" autocomplete="off">
+      </div>
+      <div class="row">
+        <label for="api_secret">API Secret</label>
+        <input id="api_secret" name="api_secret" type="password" autocomplete="off">
+      </div>
+    </fieldset>
+
+    <fieldset>
+      <legend>Session Login Credentials</legend>
+      <div class="row">
+        <label for="login_user">Username</label>
+        <input id="login_user" name="login_user" type="text" autocomplete="off">
+      </div>
+      <div class="row">
+        <label for="login_pass">Password</label>
+        <input id="login_pass" name="login_pass" type="password" autocomplete="off">
+      </div>
+      <div class="small">Only used if Auth Mode is session_login.</div>
+    </fieldset>
+
+    <div class="row" style="display:flex; gap:10px; justify-content:flex-end;">
+      <a class="btn" href="/targets">Cancel</a>
+      <button class="btn primary" type="submit">Add Target</button>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

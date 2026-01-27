@@ -1,59 +1,49 @@
 {% extends "base.html" %}
 {% block content %}
-  <form method="post" action="/logout" style="float:right;">
-    <button type="submit">Logout</button>
-  </form>
 
-  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+<div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+  <h2>Targets</h2>
+  <a class="btn primary" href="/targets/new">Add Target</a>
+</div>
 
-  <h3>Targets</h3>
-  <table>
-    <tr>
-  <th>Name</th><th>Base URL</th><th>Auth</th><th>Verify TLS</th><th>Groups</th><th>Org</th><th>Actions</th>
-    </tr>
-    {% for t in targets %}
-    <tr>
-      <td><a href="/targets/{{ t.id }}">{{ t.name }}</a></td>
-      <td>{{ t.base_url }}</td>
-      <td>{{ t.auth_mode }}</td>
-      <td>{{ "yes" if t.verify_tls else "no" }}</td>
-      <td>{{ "yes" if t.supports_groups else "no" }}</td>
-      <td>{{ t.org_name or "" }}</td>
-      <td><a href="/targets/{{ t.id }}/edit">Edit</a></td>
-    </tr>
-    {% endfor %}
-  </table>
+{% if error %}
+  <div class="alert error">
+    <div class="title">Error</div>
+    <div>{{ error }}</div>
+  </div>
+{% endif %}
 
-  <h3>Add Target</h3>
-  <form method="post" action="/targets">
-    <div class="row"><label>Name <input name="name" required></label></div>
-    <div class="row"><label>Base URL <input name="base_url" required></label></div>
+<div class="card">
+  {% if targets and targets|length > 0 %}
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Base URL</th>
+          <th>Auth</th>
+          <th>Verify TLS</th>
+          <th>Groups</th>
+          <th>Org</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in targets %}
+          <tr>
+            <td><a href="/targets/{{ t.id }}">{{ t.name }}</a></td>
+            <td>{{ t.base_url }}</td>
+            <td>{{ t.auth_mode }}</td>
+            <td>{{ "yes" if t.verify_tls else "no" }}</td>
+            <td>{{ "yes" if t.supports_groups else "no" }}</td>
+            <td>{{ t.org_name or "" }}</td>
+            <td><a href="/targets/{{ t.id }}/edit">Edit</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <div class="small">No targets yet. Click <b>Add Target</b> to create one.</div>
+  {% endif %}
+</div>
 
-    <div class="row">
-      <label>Auth Mode
-        <select name="auth_mode" required>
-          <option value="enterprise_hmac">enterprise_hmac</option>
-          <option value="session_login">session_login</option>
-        </select>
-      </label>
-    </div>
-
-    <div class="row"><label>Verify TLS <input name="verify_tls" type="checkbox" checked></label></div>
-    <div class="row"><label>Supports Groups <input name="supports_groups" type="checkbox"></label></div>
-    <div class="row"><label>Org Name (optional) <input name="org_name"></label></div>
-
-    <fieldset>
-      <legend>Enterprise HMAC Credentials</legend>
-      <div class="row"><label>API Token <input name="api_token"></label></div>
-      <div class="row"><label>API Secret <input name="api_secret"></label></div>
-    </fieldset>
-
-    <fieldset>
-      <legend>Session Login Credentials</legend>
-      <div class="row"><label>Username <input name="login_user"></label></div>
-      <div class="row"><label>Password <input name="login_pass" type="password"></label></div>
-    </fieldset>
-
-    <button type="submit">Save Target</button>
-  </form>
 {% endblock %}

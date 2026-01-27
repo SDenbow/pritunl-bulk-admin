@@ -36,6 +36,65 @@ def targets_list(request: Request, db: Session = Depends(get_db)):
     return _templates(request).TemplateResponse("targets.html", {"request": request, "targets": targets, "error": None})
 
 
+
+@router.get("/targets/new")
+def targets_new_get(request: Request, db: Session = Depends(get_db)):
+    redir = require_login(request)
+    if redir:
+        return redir
+    return _templates(request).TemplateResponse(
+        "target_new.html",
+        {"request": request, "error": None},
+    )
+
+
+@router.post("/targets/new")
+def targets_new_post(
+    request: Request,
+    name: str = Form(...),
+    base_url: str = Form(...),
+    auth_mode: str = Form(...),
+    verify_tls: str = Form(default="on"),
+    supports_groups: str = Form(default=""),
+    org_name: str = Form(default=""),
+    api_token: str = Form(default=""),
+    api_secret: str = Form(default=""),
+    login_user: str = Form(default=""),
+    login_pass: str = Form(default=""),
+    db: Session = Depends(get_db),
+):
+    redir = require_login(request)
+    if redir:
+        return redir
+
+    verify = verify_tls == "on"
+    groups = supports_groups == "on"
+
+    if auth_mode == "enterprise_hmac":
+        creds = {"api_token": api_token.strip(), "api_secret": api_secret.strip()}
+    elif auth_mode == "session_login":
+        creds = {"username": login_user.strip(), "password": login_pass}
+    else:
+        return _templates(request).TemplateResponse(
+            "target_new.html",
+            {"request": request, "error": "Invalid auth_mode"},
+        )
+
+    t = Target(
+        name=name.strip(),
+        base_url=base_url.strip(),
+        auth_mode=auth_mode,
+        verify_tls=verify,
+        supports_groups=groups,
+        org_name=org_name.strip() or None,
+        credentials_enc=encrypt_str(json.dumps(creds)),
+    )
+
+    db.add(t)
+    db.commit()
+    return RedirectResponse("/targets", status_code=303)
+
+
 @router.post("/targets")
 def targets_create(
     request: Request,

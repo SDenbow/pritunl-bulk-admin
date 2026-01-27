@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates
 
 from .settings import settings
@@ -21,6 +22,8 @@ def create_app() -> FastAPI:
         raise RuntimeError("PRITUNL_UI_MASTER_KEY must be set")
 
     app = FastAPI()
+
+    app.mount('/static', StaticFiles(directory='app/static'), name='static')
 
     Base.metadata.create_all(bind=engine)
 
