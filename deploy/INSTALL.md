@@ -94,13 +94,14 @@ If using an external reverse proxy:
 
 ## Backup / restore
 
-Backup:
+Backup (recommended):
     cd deploy
-    docker compose exec db pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" > backup.sql
+    # Uses the values from your deploy/.env file
+    docker compose exec -T db bash -lc 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > backup.sql
 
 Restore:
     cd deploy
-    cat backup.sql | docker compose exec -T db psql -U "$POSTGRES_USER" "$POSTGRES_DB"
+    cat backup.sql | docker compose exec -T db bash -lc 'psql -U "$POSTGRES_USER" "$POSTGRES_DB"'
 
 ---
 
