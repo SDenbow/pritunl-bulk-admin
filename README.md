@@ -32,6 +32,7 @@ It is built for environments where:
 - ❌ Not an identity provider (IdP)
 - ❌ Not a general-purpose IAM system
 - ❌ Not exposed to end users
+- ❌ Not designed for helpdesk or delegated administration
 
 This tool is intended for **trusted operations and infrastructure administrators only**.
 
@@ -76,11 +77,11 @@ This tool is intended for **trusted operations and infrastructure administrators
 
 ## Supported Pritunl Editions
 
-| Edition        | Supported | Notes |
-|---------------|-----------|------|
-| Community     | ✅ Yes     | Session-based admin authentication |
-| Enterprise    | ✅ Yes     | Official API token support |
-| Groups        | ⚠️ Partial | Requires Enterprise edition |
+| Edition     | Supported | Notes |
+|------------|-----------|-------|
+| Community  | ✅ Yes     | Session-based admin authentication |
+| Enterprise | ✅ Yes     | Official API token support |
+| Groups    | ⚠️ Partial | Requires Enterprise edition |
 
 ---
 
@@ -107,6 +108,64 @@ This tool is intentionally **not multi-tenant** and does not attempt to abstract
 
 ---
 
+## Administrator Responsibilities & Security Expectations
+
+This application is powerful by design. **Administrators are expected to understand the impact of their actions.**
+
+### Who should use this tool
+
+Pritunl Bulk Admin is intended for:
+
+- Infrastructure administrators
+- SecOps / Network teams
+- Operations teams performing **bulk VPN user lifecycle changes**
+
+If you should not be able to disable or delete users at scale, you should not have access to this tool.
+
+---
+
+### Trust model (important)
+
+By logging into this application, administrators implicitly acknowledge that:
+
+- They are operating in a **high-trust role**
+- Actions performed here directly affect:
+  - VPN access
+  - User connectivity
+  - Production infrastructure
+- The application **does not second-guess intent**
+
+This tool assumes administrators are acting deliberately and responsibly.
+
+---
+
+### What the application helps protect against
+
+The application provides **safety rails**, not absolution:
+
+- Dry-run previews to show *exactly* what will change
+- Explicit confirmation for destructive operations
+- Row-level visibility into applied changes
+- Immutable audit logs for accountability and review
+
+These features are designed to prevent **accidental mistakes**, not **intentional misuse**.
+
+---
+
+### What the application does NOT protect against
+
+Administrators should be aware that the system does **not** protect against:
+
+- A compromised admin account
+- Malicious or reckless actions by a trusted admin
+- Running bulk operations against the wrong target
+- Uploading incorrect or poorly validated CSV data
+- Loss of encryption keys (encrypted secrets are unrecoverable by design)
+
+Operational discipline and access control remain the responsibility of the organization.
+
+---
+
 ## Security Model (High-Level)
 
 - Encrypted credential storage
@@ -116,7 +175,7 @@ This tool is intentionally **not multi-tenant** and does not attempt to abstract
 - Automatic superadmin assignment for first admin
 - Complete audit logging of bulk actions
 
-Optional outer protections (e.g. network ACLs or reverse proxy auth) may be added based on organizational policy.
+Optional outer protections (network ACLs, VPN-only access, reverse proxy auth) may be added based on organizational policy.
 
 ---
 
