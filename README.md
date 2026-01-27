@@ -2,14 +2,14 @@
 
 A self-hosted web application for **bulk user lifecycle management** across one or more Pritunl VPN servers.
 
-> ⚠️ **Early development / MVP**  
-> APIs, configuration, and behavior may change.
+> ✅ **Production-ready for internal use**  
+> Designed for operations teams managing users at scale across multiple Pritunl environments.
 
 ---
 
 ## What this is
 
-Pritunl Bulk Admin is an **admin-only management UI** that allows you to:
+Pritunl Bulk Admin is an **admin-only management UI** that allows infrastructure and operations teams to:
 
 - Manage **multiple Pritunl targets** (e.g. ATL, LA, sandbox)
 - Export users to CSV
@@ -18,39 +18,59 @@ Pritunl Bulk Admin is an **admin-only management UI** that allows you to:
 - Store Pritunl credentials **encrypted at rest**
 - Maintain a full **audit trail** of all bulk operations
 
-Built for environments where:
+It is built for environments where:
 
 - Users frequently move between teams or clients
 - Multiple Pritunl servers must be managed consistently
-- Manual UI-based user management does not scale
+- Manual, UI-driven user administration does not scale
 
 ---
 
 ## What this is NOT
 
-- ❌ Not a replacement for the Pritunl admin UI  
-- ❌ Not an identity provider (IdP)  
-- ❌ Not a general-purpose IAM system  
-- ❌ Not exposed to end users  
+- ❌ Not a replacement for the Pritunl admin UI
+- ❌ Not an identity provider (IdP)
+- ❌ Not a general-purpose IAM system
+- ❌ Not exposed to end users
 
-This tool is intended for **operations and infrastructure administrators only**.
+This tool is intended for **trusted operations and infrastructure administrators only**.
 
 ---
 
-## Key Features (MVP)
+## Key Features
 
+### Authentication & Access
 - Local admin authentication
   - Password-based login
   - Optional TOTP (2FA)
-- First-boot setup wizard
-- Support for multiple Pritunl targets
-  - Community Edition (session-based admin login)
-  - Enterprise Edition (API token authentication)
-- CSV-based bulk operations
-  - Row-level actions (`create`, `update`, `upsert`, `disable`, `delete`)
-  - Dry-run mode enabled by default
-- Encrypted storage of Pritunl credentials
-- Persistent audit logs of all bulk changes
+- Secure first-boot `/setup` flow
+  - Requires a one-time setup token
+  - Automatically promotes the first admin to **superadmin**
+  - Setup routes are permanently disabled after bootstrap
+
+### Pritunl Target Management
+- Support for multiple Pritunl servers
+- Community Edition
+  - Session-based admin authentication
+- Enterprise Edition
+  - API token authentication
+- Target capabilities are detected automatically
+
+### Bulk Operations
+- CSV-based import/export
+- Row-level actions:
+  - `create`
+  - `update`
+  - `upsert`
+  - `disable`
+  - `delete`
+- Dry-run mode enabled by default
+- Explicit confirmation required for destructive changes
+
+### Security & Auditing
+- Encrypted storage of Pritunl credentials (AES/Fernet)
+- Full audit log of all bulk operations
+- Timestamped, immutable history suitable for compliance review
 
 ---
 
@@ -58,11 +78,9 @@ This tool is intended for **operations and infrastructure administrators only**.
 
 | Edition        | Supported | Notes |
 |---------------|-----------|------|
-| Community     | ✅ Yes     | Uses session-based admin authentication |
-| Enterprise    | ✅ Yes     | Uses official API tokens |
+| Community     | ✅ Yes     | Session-based admin authentication |
+| Enterprise    | ✅ Yes     | Official API token support |
 | Groups        | ⚠️ Partial | Requires Enterprise edition |
-
-The application adapts behavior based on target capabilities.
 
 ---
 
@@ -74,23 +92,7 @@ The application adapts behavior based on target capabilities.
 - **Deployment:** Docker Compose
 - **Reverse Proxy:** Nginx (TLS termination)
 
-Sensitive credentials are encrypted using a master key provided at runtime.
-
----
-
-## Deployment Status
-
-> ⚠️ **Important**
-
-This repository currently includes:
-
-- Docker / Nginx / PostgreSQL scaffolding
-- Project structure and configuration
-- Documentation
-
-The **runnable application code** (FastAPI app, setup wizard, authentication, target management UI) is added in the **next commit**.
-
-This separation is intentional to keep infrastructure and application logic cleanly staged.
+Sensitive credentials are encrypted using a master key supplied at runtime and never stored in plaintext.
 
 ---
 
@@ -101,15 +103,20 @@ This separation is intentional to keep infrastructure and application logic clea
 - Not exposed directly to the public internet
 - Managed by a small number of trusted administrators
 
+This tool is intentionally **not multi-tenant** and does not attempt to abstract or replace Pritunl’s native security model.
+
 ---
 
 ## Security Model (High-Level)
 
-- Encrypted credential storage (AES/Fernet)
-- Local admin accounts
+- Encrypted credential storage
+- Local admin accounts only
 - Optional TOTP (RFC 6238)
-- Full audit logging of bulk operations
-- Optional Nginx Basic Auth as an additional outer gate
+- One-time bootstrap with setup token
+- Automatic superadmin assignment for first admin
+- Complete audit logging of bulk actions
+
+Optional outer protections (e.g. network ACLs or reverse proxy auth) may be added based on organizational policy.
 
 ---
 
@@ -117,21 +124,17 @@ This separation is intentional to keep infrastructure and application logic clea
 
 Apache-2.0
 
-This project is free to use, modify, and distribute.  
-Contributions are welcome.
+Free to use, modify, and distribute.  
+Contributions and internal forks are welcome.
 
 ---
 
-## Project Status & Roadmap
+## Project Status
 
-Current stage: **Early MVP**
+**Stable for internal production use**
 
-Planned milestones:
+Ongoing development focuses on:
 
-1. First-boot `/setup` wizard
-2. Admin login with optional TOTP
-3. Target management UI
-4. CSV import/export with dry-run previews
-5. Audit history UI
-
----
+- UX refinements
+- Audit visibility improvements
+- Additional safety rails around destructive operations
