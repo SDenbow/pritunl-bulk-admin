@@ -48,8 +48,6 @@ def setup_get(
 ):
     if not _setup_allowed(db):
         return RedirectResponse(url="/login?msg=setup_complete", status_code=303)
-    if not _token_ok(token):
-        return Response(status_code=403)
 
     return _templates(request).TemplateResponse(
         "setup_admin.html",
@@ -69,8 +67,6 @@ def setup_post(
 ):
     if not _setup_allowed(db):
         return RedirectResponse(url="/login?msg=setup_complete", status_code=303)
-    if not _token_ok(token):
-        return Response(status_code=403)
 
     username = username.strip()
     if not username:
@@ -121,8 +117,6 @@ def setup_totp_get(
     u: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    if not _token_ok(token):
-        return Response(status_code=403)
 
     admin = db.query(Admin).filter(Admin.username == u).first()
     if not admin or not admin.is_totp_enabled or not admin.totp_secret_enc:
@@ -151,8 +145,6 @@ def setup_totp_qr(
     u: str = Query(...),
     db: Session = Depends(get_db),
 ):
-    if not _token_ok(token):
-        return Response(status_code=403)
 
     admin = db.query(Admin).filter(Admin.username == u).first()
     if not admin or not admin.is_totp_enabled or not admin.totp_secret_enc:
@@ -176,8 +168,6 @@ def setup_totp_post(
     code: str = Form(...),
     db: Session = Depends(get_db),
 ):
-    if not _token_ok(token):
-        return Response(status_code=403)
 
     admin = db.query(Admin).filter(Admin.username == u).first()
     if not admin or not admin.is_totp_enabled or not admin.totp_secret_enc:
