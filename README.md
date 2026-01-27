@@ -2,37 +2,39 @@
 
 A self-hosted web application for **bulk user lifecycle management** across one or more Pritunl VPN servers.
 
-> ✅ **Production-ready for internal use**  
-> Designed for operations teams managing users at scale across multiple Pritunl environments.
+> ✅ **Stable v1.0 — production-ready for internal use**  
+> Designed for trusted operations teams managing users at scale across multiple Pritunl environments.
 
 ---
 
 ## What this is
 
-Pritunl Bulk Admin is an **admin-only management UI** that allows infrastructure and operations teams to:
+Pritunl Bulk Admin is an **admin-only management UI** that allows infrastructure and operations teams to safely perform **bulk user operations** against one or more Pritunl servers.
 
-- Manage **multiple Pritunl targets** (e.g. ATL, LA, sandbox)
-- Export users to CSV
-- Import CSV files to **create, update, disable, or delete users**
-- Perform **dry-run previews** before making changes
-- Store Pritunl credentials **encrypted at rest**
-- Maintain a full **audit trail** of all bulk operations
+It is designed for environments where:
 
-It is built for environments where:
-
-- Users frequently move between teams or clients
+- Users frequently move between teams, roles, or clients
 - Multiple Pritunl servers must be managed consistently
 - Manual, UI-driven user administration does not scale
+- Change accountability and auditability matter
+
+Core capabilities include:
+
+- Managing **multiple Pritunl targets** (e.g. prod, staging, sandbox)
+- Exporting users to CSV
+- Importing CSV files to **create, update, disable, or delete users**
+- Performing **dry-run previews** before applying changes
+- Encrypting Pritunl credentials **at rest**
+- Maintaining a complete **audit history** of bulk operations
 
 ---
 
 ## What this is NOT
 
-- ❌ Not a replacement for the Pritunl admin UI
-- ❌ Not an identity provider (IdP)
-- ❌ Not a general-purpose IAM system
-- ❌ Not exposed to end users
-- ❌ Not designed for helpdesk or delegated administration
+- ❌ Not a replacement for the Pritunl admin UI  
+- ❌ Not an identity provider (IdP)  
+- ❌ Not a general-purpose IAM system  
+- ❌ Not exposed to end users  
 
 This tool is intended for **trusted operations and infrastructure administrators only**.
 
@@ -58,7 +60,7 @@ This tool is intended for **trusted operations and infrastructure administrators
 - Target capabilities are detected automatically
 
 ### Bulk Operations
-- CSV-based import/export
+- CSV-based import and export
 - Row-level actions:
   - `create`
   - `update`
@@ -78,7 +80,7 @@ This tool is intended for **trusted operations and infrastructure administrators
 ## Supported Pritunl Editions
 
 | Edition     | Supported | Notes |
-|------------|-----------|-------|
+|------------|-----------|------|
 | Community  | ✅ Yes     | Session-based admin authentication |
 | Enterprise | ✅ Yes     | Official API token support |
 | Groups    | ⚠️ Partial | Requires Enterprise edition |
@@ -93,7 +95,32 @@ This tool is intended for **trusted operations and infrastructure administrators
 - **Deployment:** Docker Compose
 - **Reverse Proxy:** Nginx (TLS termination)
 
-Sensitive credentials are encrypted using a master key supplied at runtime and never stored in plaintext.
+Sensitive credentials are encrypted using a master key supplied at runtime and are never stored in plaintext.
+
+---
+
+## Security Model & Threat Assumptions
+
+This application makes **explicit assumptions** about its operating environment:
+
+- Deployed on an **internal network or VPN**
+- Accessible only to a **small number of trusted administrators**
+- Not hardened for untrusted or public internet exposure
+
+Security controls include:
+
+- Encrypted credential storage
+- Local admin accounts only
+- Optional TOTP (RFC 6238)
+- One-time bootstrap with setup token
+- Automatic superadmin assignment for first admin
+- Complete audit logging of bulk actions
+
+> ⚠️ **Important**  
+> This tool can create, disable, or delete VPN users in bulk.  
+> Administrators are expected to review dry-run previews and audit history before applying changes.
+
+Optional outer protections (network ACLs, VPN access, reverse proxy controls) may be added based on organizational policy.
 
 ---
 
@@ -104,78 +131,40 @@ Sensitive credentials are encrypted using a master key supplied at runtime and n
 - Not exposed directly to the public internet
 - Managed by a small number of trusted administrators
 
-This tool is intentionally **not multi-tenant** and does not attempt to abstract or replace Pritunl’s native security model.
+This tool is intentionally **not multi-tenant** and does not attempt to replace or abstract Pritunl’s native security model.
 
 ---
 
-## Administrator Responsibilities & Security Expectations
+## Screenshots
 
-This application is powerful by design. **Administrators are expected to understand the impact of their actions.**
+> Screenshots show example workflows using **test data**.  
+> Sensitive values (credentials, tokens, secrets) are redacted.
 
-### Who should use this tool
+### Targets overview
+Manage multiple Pritunl servers from a single admin interface.
 
-Pritunl Bulk Admin is intended for:
+![Targets](docs/screenshots/targets.png)
 
-- Infrastructure administrators
-- SecOps / Network teams
-- Operations teams performing **bulk VPN user lifecycle changes**
+### CSV import preview (dry-run)
+Review planned changes before applying them.
 
-If you should not be able to disable or delete users at scale, you should not have access to this tool.
+![Import Preview](docs/screenshots/import-preview.png)
 
----
+### Audit history
+View a complete, timestamped history of bulk operations.
 
-### Trust model (important)
+![Audit History](docs/screenshots/audit-list.png)
 
-By logging into this application, administrators implicitly acknowledge that:
+### Audit entry details
+Inspect individual actions with redacted request/response context.
 
-- They are operating in a **high-trust role**
-- Actions performed here directly affect:
-  - VPN access
-  - User connectivity
-  - Production infrastructure
-- The application **does not second-guess intent**
-
-This tool assumes administrators are acting deliberately and responsibly.
+![Audit Entry](docs/screenshots/audit-entry.png)
 
 ---
 
-### What the application helps protect against
+## Installation
 
-The application provides **safety rails**, not absolution:
-
-- Dry-run previews to show *exactly* what will change
-- Explicit confirmation for destructive operations
-- Row-level visibility into applied changes
-- Immutable audit logs for accountability and review
-
-These features are designed to prevent **accidental mistakes**, not **intentional misuse**.
-
----
-
-### What the application does NOT protect against
-
-Administrators should be aware that the system does **not** protect against:
-
-- A compromised admin account
-- Malicious or reckless actions by a trusted admin
-- Running bulk operations against the wrong target
-- Uploading incorrect or poorly validated CSV data
-- Loss of encryption keys (encrypted secrets are unrecoverable by design)
-
-Operational discipline and access control remain the responsibility of the organization.
-
----
-
-## Security Model (High-Level)
-
-- Encrypted credential storage
-- Local admin accounts only
-- Optional TOTP (RFC 6238)
-- One-time bootstrap with setup token
-- Automatic superadmin assignment for first admin
-- Complete audit logging of bulk actions
-
-Optional outer protections (network ACLs, VPN-only access, reverse proxy auth) may be added based on organizational policy.
+See [`deploy/INSTALL.md`](deploy/INSTALL.md) for full deployment and bootstrap instructions.
 
 ---
 
@@ -190,10 +179,9 @@ Contributions and internal forks are welcome.
 
 ## Project Status
 
-**Stable for internal production use**
+**v1.0 — Stable for internal production use**
 
-Ongoing development focuses on:
-
+Future work focuses on:
 - UX refinements
 - Audit visibility improvements
 - Additional safety rails around destructive operations
