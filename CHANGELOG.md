@@ -1,3 +1,19 @@
+## [1.1.0] - 2026-02-07
+
+### Added
+
+- Automatically trigger Pritunl key/profile email after user creation (v1.32-compatible)
+
+- Uses PUT /user/{org}/{user} with send_key_email flag (matches UI behavior)
+
+
+
+### Fixed
+
+- Removed incorrect key endpoint probing for Pritunl 1.32
+
+
+
 # Changelog
 
 ## v1.0.0
