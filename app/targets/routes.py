@@ -586,7 +586,14 @@ def target_import_apply(
                         raise RuntimeError("Create requires username")
 
                     groups = (r.desired or {}).get("groups") or []
-                    resp = create_user(client, org_id, name=name, email=email, groups=groups if t.supports_groups else None)
+                    resp = create_user(
+                        client,
+                        org_id,
+                        name=name,
+                        email=email,
+                        groups=groups if t.supports_groups else None,
+                        send_key_email=True,
+                    )
 
                     db.add(AuditLog(
                         actor=actor,
